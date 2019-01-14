@@ -36,8 +36,10 @@
      console.log("err", e.message);
    }
  });
- 
+
  my.on("datapoint value", payload => {
+   // please keep in mind that payload may be array of datapoint values
+   // so, check it at first with Array.isArray
    console.log("broadcasted datapoint value: ", payload);
  });
  
