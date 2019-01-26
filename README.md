@@ -25,7 +25,7 @@
      console.log("get sdk state:", await my.getSdkState());
      console.log("get value:", await my.getValue([1, 107, 106]));
      console.log("get stored value:", await my.getValue([1, 107, 106]));
-     console.log("get server item:", await my.getServerItem("SerialNumber"));
+     console.log("get server item:", await my.getServerItem([1, 2, 3]));
      console.log("set value:", await my.setValue({id: 103, value: 0}));
      console.log("read value:", await my.readValue([1, 103, 104, 105]));
      console.log("get programming mode:", await my.getProgrammingMode());

@@ -6,13 +6,23 @@ let BobaosBQ = params => {
   let _params = {
     redis: null,
     request_channel: "bobaos_req",
+    service_channel: "bobaos_service",
     broadcast_channel: "bobaos_bcast"
   };
 
   let self = new EE();
   Object.assign(_params, params);
+
+  let _redis = Redis.createClient(_params.redis);
+
+  // common request queue
   const jqueue = new Queue(_params.request_channel, {
-    redis: _params.redis,
+    redis: _redis,
+    isWorker: false
+  });
+  // service queue
+  const squeue = new Queue(_params.service_channel, {
+    redis: _redis,
     isWorker: false
   });
 
@@ -22,7 +32,7 @@ let BobaosBQ = params => {
     self.emit("ready");
   });
 
-  jqueue.on("job succeeded", (id, result) => {
+  const onJobSucceeded =  (id, result) => {
     // hack: sometimes this event is fired before job.save.then
     // so, set timeout to be sure that job save then was called
     setTimeout(_ => {
@@ -43,12 +53,14 @@ let BobaosBQ = params => {
         // console.log(`Couldn't find job with id ${id}`);
       }
     }, 1);
-  });
+  };
+  jqueue.on("job succeeded", onJobSucceeded);
+  squeue.on("job succeeded", onJobSucceeded);
 
   // Never used?
-  jqueue.on("job failed", (id, result) => {
-    console.log(`Job ${id} failed with result: ${result}`);
-  });
+  // jqueue.on("job failed", (id, result) => {
+    // console.log(`Job ${id} failed with result: ${result}`);
+  // });
 
   self.commonRequest = (method, payload) => {
     return new Promise((resolve, reject) => {
@@ -71,16 +83,37 @@ let BobaosBQ = params => {
         });
     });
   };
+  self.serviceRequest = (method, payload) => {
+    return new Promise((resolve, reject) => {
+      squeue
+        .createJob({ method: method, payload: payload })
+        .save()
+        .then(job => {
+          let { id } = job;
+          let callback = (err, result) => {
+            if (err) {
+              return reject(err);
+            }
+
+            resolve(result);
+          };
+          jobs.push({ id: id, callback: callback });
+        })
+        .catch(e => {
+          reject(e);
+        });
+    });
+  };
 
   // service
   self.ping = _ => {
-    return self.commonRequest("ping", null);
+    return self.serviceRequest("ping", null);
   };
   self.getSdkState = _ => {
-    return self.commonRequest("get sdk state", null);
+    return self.serviceRequest("get sdk state", null);
   };
   self.reset = _ => {
-    return self.commonRequest("reset", null);
+    return self.serviceRequest("reset", null);
   };
 
   // datapoints
