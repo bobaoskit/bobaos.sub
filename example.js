@@ -1,4 +1,4 @@
-const BobaosSub = require('./');
+const BobaosSub = require("./");
 
 let my = BobaosSub();
 
@@ -12,14 +12,14 @@ my.on("ready", async _ => {
     console.log("ping:", await my.ping());
     console.log("get sdk state:", await my.getSdkState());
     console.log("get value:", await my.getValue([1, 107, 106]));
-    console.log("get stored value:", await my.getValue([1, 107, 106]));
-    console.log("set value:", await my.setValue({id: 11, value: 16}));
+    console.log("get stored value:", await my.getStoredValue([1, 107, 106]));
+    console.log("set value:", await my.setValue({ id: 11, value: 16 }));
     console.log("read value:", await my.readValue([1, 6, 7, 8]));
     console.log("get programming mode:", await my.getProgrammingMode());
     console.log("get parameter byte", await my.getParameterByte([1, 2, 3, 4]));
     console.log("reset", await my.reset());
     console.log("get server item:", await my.getServerItem(null));
-  } catch(e) {
+  } catch (e) {
     console.log("err", e.message);
   }
 });

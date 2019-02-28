@@ -7,7 +7,9 @@ let BobaosBQ = params => {
     redis: null,
     request_channel: "bobaos_req",
     service_channel: "bobaos_service",
-    broadcast_channel: "bobaos_bcast"
+    broadcast_channel: "bobaos_bcast",
+    use_timestamp: true,
+    timestamp_key: "bobaos:timestamp"
   };
 
   let self = new EE();
@@ -32,7 +34,7 @@ let BobaosBQ = params => {
     self.emit("ready");
   });
 
-  const onJobSucceeded =  (id, result) => {
+  const onJobSucceeded = (id, result) => {
     // hack: sometimes this event is fired before job.save.then
     // so, set timeout to be sure that job save then was called
     setTimeout(_ => {
@@ -40,7 +42,7 @@ let BobaosBQ = params => {
       let found = jobs.findIndex(findById);
       if (found > -1) {
         // TODO: resolve/reject
-        let {method, payload} = result;
+        let { method, payload } = result;
         if (method === "success") {
           jobs[found].callback(null, payload);
         }
@@ -57,52 +59,53 @@ let BobaosBQ = params => {
   jqueue.on("job succeeded", onJobSucceeded);
   squeue.on("job succeeded", onJobSucceeded);
 
-  // Never used?
-  // jqueue.on("job failed", (id, result) => {
-    // console.log(`Job ${id} failed with result: ${result}`);
-  // });
-
-  self.commonRequest = (method, payload) => {
+  self._request = (queue, method, payload) => {
     return new Promise((resolve, reject) => {
-      jqueue
-        .createJob({ method: method, payload: payload })
-        .save()
-        .then(job => {
-          let { id } = job;
-          let callback = (err, result) => {
-            if (err) {
-              return reject(err);
-            }
+      let job_data = {};
+      job_data.method = method;
+      job_data.payload = payload;
 
-            resolve(result);
-          };
-          jobs.push({ id: id, callback: callback });
-        })
-        .catch(e => {
-          reject(e);
+      const _sendJob = _ => {
+        queue
+          .createJob(job_data)
+          .save()
+          .then(job => {
+            let { id } = job;
+            let callback = (err, result) => {
+              if (err) {
+                return reject(err);
+              }
+
+              resolve(result);
+            };
+            jobs.push({ id: id, callback: callback });
+          })
+          .catch(e => {
+            reject(e);
+          });
+      };
+
+      // get timestamp from redis and send with job
+      if (_params.use_timestamp) {
+        _redis.get(_params.timestamp_key, (err, res) => {
+          if (err) {
+            return reject(err);
+          }
+
+          job_data.timestamp = res;
+
+          return _sendJob();
         });
+      } else {
+        return _sendJob();
+      }
     });
   };
+  self.commonRequest = (method, payload) => {
+    return self._request(jqueue, method, payload);
+  };
   self.serviceRequest = (method, payload) => {
-    return new Promise((resolve, reject) => {
-      squeue
-        .createJob({ method: method, payload: payload })
-        .save()
-        .then(job => {
-          let { id } = job;
-          let callback = (err, result) => {
-            if (err) {
-              return reject(err);
-            }
-
-            resolve(result);
-          };
-          jobs.push({ id: id, callback: callback });
-        })
-        .catch(e => {
-          reject(e);
-        });
-    });
+    return self._request(squeue, method, payload);
   };
 
   // service
@@ -150,7 +153,7 @@ let BobaosBQ = params => {
 
   // now events
   const redisSub = Redis.createClient(_params.redis);
-  redisSub.on("message", function(channel, message) {
+  redisSub.on("message", (channel, message) => {
     try {
       let { method, payload } = JSON.parse(message);
       if (method === "datapoint value") {
@@ -168,8 +171,8 @@ let BobaosBQ = params => {
   });
 
   redisSub.subscribe(_params.broadcast_channel);
+
   return self;
 };
 
 module.exports = BobaosBQ;
-
