@@ -123,6 +123,9 @@ let BobaosBQ = params => {
   self.getDescription = payload => {
     return self.commonRequest("get description", payload);
   };
+  self.getDescriptionString = payload => {
+    return self.commonRequest("get description string", payload);
+  };
   self.getValue = payload => {
     return self.commonRequest("get value", payload);
   };
@@ -131,6 +134,9 @@ let BobaosBQ = params => {
   };
   self.setValue = payload => {
     return self.commonRequest("set value", payload);
+  };
+  self.putValue = payload => {
+    return self.commonRequest("put value", payload);
   };
   self.readValue = payload => {
     return self.commonRequest("read value", payload);
